@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
     import { dealInitialCards } from './modules/dealing';
     import { handleCapture, handleBuild } from './modules/turns';
     import { calculateScores } from './modules/scoring';
-    import { isValidCapture } from './modules/captureLogic.js';
+    import { isValidCapture, CaptureValidator } from './modules/captureLogic.js';
     import { isValidBuild } from './modules/buildLogic.js';
 
     function App() {
@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react';
       const [player2Hand, setPlayer2Hand] = useState([]);
       const [tableCards, setTableCards] = useState([]);
       const [player1Score, setPlayer1Score] = useState(0);
-      const [player2Score, setPlayer2Score] = useState(0);
+      const [player2Score] = useState(0);
       const [currentPlayer, setCurrentPlayer] = useState(1);
       const [lastCapturer, setLastCapturer] = useState(null);
       const [gamePhase, setGamePhase] = useState('initialDeal');
@@ -38,7 +38,7 @@ import { useState, useEffect } from 'react';
         setPlayer2Hand([]);
         setTableCards([]);
         setPlayer1Score(0);
-        setPlayer2Score(0);
+        const [player2Score] = useState(0);
         setCurrentPlayer(1);
         setLastCapturer(null);
         setGamePhase('initialDeal');
@@ -111,6 +111,54 @@ import { useState, useEffect } from 'react';
       };
 
       const playCapture = () => {
+        if (selectedCard && selectedTableCards.length > 0 && !hasPlayedCard) {
+          const validCaptures = CaptureValidator.getValidCaptures(selectedCard, tableCards, currentPlayer === 1 ? player1Hand : player2Hand);
+
+          if (!validCaptures.some(capture =>
+            capture.length === selectedTableCards.length && capture.every(card => selectedTableCards.includes(card))
+          )) {
+            alert("Invalid capture! The selected cards do not form a valid capture combination.");
+            return;
+          }
+
+          const { newP1Score, newP2Score, newTableCards, newLastCapturer, sweep, newMessage } =
+            handleCapture(
+              selectedCard,
+              selectedTableCards,
+              currentPlayer,
+              player1Score,
+              player2Score,
+              tableCards,
+              lastCapturer,
+              player1Pile,
+              player2Pile,
+              setPlayer1Pile,
+              setPlayer2Pile
+            );
+
+          setPlayer1Score(newP1Score);
+          setPlayer2Score(newP2Score);
+          setTableCards(newTableCards);
+          setLastCapturer(newLastCapturer);
+          if (sweep) setMessage(newMessage);
+
+          // Remove the played card from the player's hand
+          if (currentPlayer === 1) {
+            setPlayer1Hand(player1Hand.filter(card => card.suitRank !== selectedCard.suitRank));
+            setPlayer1Pile([...player1Pile, selectedCard, ...selectedTableCards]);
+          } else {
+            setPlayer2Hand(player2Hand.filter(card => card.suitRank !== selectedCard.suitRank));
+            setPlayer2Pile([...player2Pile, selectedCard, ...selectedTableCards]);
+          }
+
+          // Remove captured cards from the table
+          setTableCards(tableCards.filter(card => !selectedTableCards.includes(card)));
+
+          setHasPlayedCard(true);
+          switchPlayer();
+          setSelectedCard(null);
+          setSelectedTableCards([]);
+        }
       };
 
       const playBuild = () => {
@@ -153,37 +201,12 @@ import { useState, useEffect } from 'react';
       };
 
       const calculateFinalScores = () => {
-        let p1Score = player1Score;
-        let p2Score = player2Score;
-
-        // Most cards
-        if (player1Pile.length > player2Pile.length) {
-          p1Score += 3;
-        } else if (player2Pile.length > player1Pile.length) {
-          p2Score += 3;
-        }
-
-        // Most spades
-        const p1Spades = player1Pile.filter((card) => card.suit === 'S').length;
-        const p2Spades = player2Pile.filter((card) => card.suit === 'S').length;
-        if (p1Spades > p2Spades) {
-          p1Score += 1;
-        } else if (p2Spades > p1Spades) {
-          p2Score += 1;
-        }
-
-        // Card points
-        player1Pile.forEach(card => {
-          if (card.rank === 'A') p1Score += 1;
-          if (card.suitRank === 'D10') p1Score += 2;
-          if (card.suitRank === 'S2') p1Score += 1;
-        });
-
-        player2Pile.forEach(card => {
-          if (card.rank === 'A') p2Score += 1;
-          if (card.suitRank === 'D10') p2Score += 2;
-          if (card.suitRank === 'S2') p2Score += 1;
-        });
+        const { p1Score, p2Score } = calculateScores(
+          player1Pile,
+          player2Pile,
+          player1Score,
+          player2Score
+        );
         setPlayer1Score(p1Score);
         setPlayer2Score(p2Score);
         setGamePhase('gameOver');
