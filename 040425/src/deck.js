@@ -4,9 +4,9 @@
 export const getValue = (rank) => {
   if (["J", "Q", "K"].includes(rank)) return 10;
   if (rank === "A") return 1;
-  // Ensure rank is treated as a string for parseInt, handle potential non-numeric ranks gracefully
-  const parsedValue = parseInt(String(rank), 10);
-  return isNaN(parsedValue) ? 0 : parsedValue; // Return 0 if not a number
+  // Ensure rank is treated as a number if possible
+  const numRank = parseInt(rank);
+  return isNaN(numRank) ? 0 : numRank; // Return 0 if not a number (shouldn't happen with standard deck)
 };
 
 // Value map for captures (Ace=14, J=11, Q=12, K=13)

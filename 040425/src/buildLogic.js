@@ -4,16 +4,13 @@ import { getValue } from './deck';
 // Helper to get the build value of a card (Ace=1)
 const getBuildValue = (card) => {
     if (!card) return 0;
-    // Ensure rank is treated as a number if possible, using getValue which handles J/Q/K/A correctly for building
-    return getValue(card.rank); // getValue should return 1 for Ace here
+    return card.rank === 'A' ? 1 : getValue(card.rank); // getValue assumes Ace=1 already
 };
 
 // Helper to get the value of a table item for building (card or simple build)
 const getItemValue = (item) => {
   if (!item) return 0;
   if (item.type === 'card') {
-    // Face cards have no build value
-    if (['J', 'Q', 'K'].includes(item.rank)) return 0;
     return getBuildValue(item); // Use Ace=1
   }
   if (item.type === 'build' && !item.isCompound) {
@@ -36,7 +33,7 @@ export const validateBuild = (playedCard, selectedItems, playerHand) => {
     return { isValid: false, message: "Select a card from hand and items from table." };
   }
 
-  // Rule: Cannot use face cards in builds (either played or selected)
+  // Rule: Cannot use face cards in builds
   if (isFaceCard(playedCard) || selectedItems.some(item => item.type === 'card' && isFaceCard(item))) {
       return { isValid: false, message: "Face cards cannot be used in builds." };
   }
@@ -46,13 +43,7 @@ export const validateBuild = (playedCard, selectedItems, playerHand) => {
   }
 
   const playedCardValue = getBuildValue(playedCard);
-  // Ensure selected items contribute valid values (getItemValue returns 0 for invalid types)
   const selectedItemsValue = selectedItems.reduce((sum, item) => sum + getItemValue(item), 0);
-
-  // If any selected item had 0 value (was pair/compound build), the sum might be wrong, but the earlier check handles this.
-  // However, if a selected card was a face card, getItemValue would return 0, leading to incorrect targetValue.
-  // The face card check at the beginning prevents this specific issue.
-
   const targetValue = playedCardValue + selectedItemsValue;
 
   // Rule: Must hold a card matching the target build value IN HAND
